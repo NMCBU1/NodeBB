@@ -2,7 +2,7 @@
 
 const cacheCreate = require('../cache/ttl');
 const meta = require('../meta');
-const helpers = require('./helpers');
+const helpers = require('./helpers').default;
 const user = require('../user');
 
 const cache = cacheCreate({
@@ -12,7 +12,8 @@ const cache = cacheCreate({
 exports.clearCache = function () {
     cache.clear();
 };
-
+console.log("helpers.try: ")
+console.log(helpers.try)
 exports.ratelimit = helpers.try(async (req, res, next) => {
     const { uid } = req;
     if (!meta.config.uploadRateLimitThreshold || (uid && await user.isAdminOrGlobalMod(uid))) {
