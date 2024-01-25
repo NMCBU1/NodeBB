@@ -12,8 +12,7 @@ const cache = cacheCreate({
 exports.clearCache = function () {
     cache.clear();
 };
-console.log("helpers.try: ")
-console.log(helpers.try)
+
 exports.ratelimit = helpers.try(async (req, res, next) => {
     const { uid } = req;
     if (!meta.config.uploadRateLimitThreshold || (uid && await user.isAdminOrGlobalMod(uid))) {

@@ -1,66 +1,70 @@
-import { Request, Response, NextFunction } from 'express';
-import * as winston from 'winston';
+import winston from 'winston';
 import validator from 'validator';
+import { Request, Response, NextFunction } from 'express';
 import slugify from '../slugify';
-import * as meta from '../meta';
-
-declare function slugify(input: string): string;
+import meta from '../meta';
 
 
-interface TemplateData {
+interface Breadcrumb {
+    cid?: string | number;
+}
+
+interface TemplateData{
+    breadcrumbs?: Breadcrumb[];
+    // Include other properties of templateData here
     template?: {
-      topic?: string; // Replace 'any' with a more specific type if you know the structure
+        topic?: string; // Replace 'any' with a more specific type if known
     };
-    category?: {
-        cid: string;
+    category: {
+        cid: string | number;
         name: string;
-      }
-    breadcrumbs?: Array<{ cid: string }>;
+    };
 }
 
 interface CustomRequest extends Request {
-    loggedIn: boolean; // Add your custom properties here
+    loggedIn?: boolean; // Assuming loggedIn is a boolean
+    // Add any other custom properties here
 }
-
-interface Config {
-    [key: string]: string; // or a more specific type if possible
-}
-
-interface Meta {
-    config: Config;
-}
-
-let meta: Meta;
 
 const helpers = {
-    try: (middleware: (req: Request, res: Response, next: NextFunction) => Promise<void> | void) => async (
-        req: Request, res: Response, next: NextFunction
-    ) => {
-        try {
-            await middleware(req, res, next);
-        } catch (err) {
-            next(err);
-        }
+    try(middleware: (req: Request, res: Response, next: NextFunction) => Promise<void> | void):
+    (req: Request, res: Response, next: NextFunction) => Promise<void>|void {
+        return function (req: Request, res: Response, next: NextFunction): void {
+            try {
+                const result = middleware(req, res, next);
+                if (result instanceof Promise) {
+                    result.then(() => {
+                        // Handle successful resolution here, if needed
+                    }).catch((err) => {
+                        // Error handling
+                        next(err);
+                    });
+                }
+            } catch (err) {
+                next(err);
+            }
+        };
     },
-    buildBodyClass: (req: CustomRequest, res: Response, templateData: TemplateData = {}) => {
+
+    buildBodyClass(req: CustomRequest, res: Response, templateData: TemplateData): string {
         const clean = req.path.replace(/^\/api/, '').replace(/^\/|\/$/g, '');
         const parts = clean.split('/').slice(0, 3);
-        parts.forEach((part : string, index) => {
-            let p : string = part;
+        parts.forEach((p:string, index) => {
             try {
-                p = slugify(decodeURIComponent(p));
-            } catch (err: unknown) {
-                if (err instanceof Error) {
-                    winston.error(`Error decoding URI: ${p}`);
-                    winston.error(err.stack);
-                }
+                p = slugify(decodeURIComponent(p)) as string;
+            } catch (err) {
+                const error = err as Error; // Type assertion
+                winston.error(`Error decoding URI: ${p}`);
+                winston.error(error.stack);
+                p = '';
             }
             p = validator.escape(String(p));
             parts[index] = index ? `${parts[0]}-${p}` : `page-${p || 'home'}`;
         });
+
         if (templateData.template && templateData.template.topic) {
             parts.push(`page-topic-category-${templateData.category.cid}`);
-            parts.push(`page-topic-category-${slugify(templateData.category.name)}`);
+            parts.push(`page-topic-category-${slugify(templateData.category.name) as string}`);
         }
         if (Array.isArray(templateData.breadcrumbs)) {
             templateData.breadcrumbs.forEach((crumb) => {
@@ -70,17 +74,20 @@ const helpers = {
             });
         }
         parts.push(`page-status-${res.statusCode}`);
-        if (typeof meta.config['theme:id'] === 'string') {
-            parts.push(`theme-${meta.config['theme:id'].split('-')[2]}`);
-        } else {
-            // Handle the case where 'theme:id' is not a string
-        }
+        // The next line calls a function in a module that has not been updated to TS yet
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        parts.push(`theme-${meta.config['theme:id'].split('-')[2] as string}`);
         if (req.loggedIn) {
             parts.push('user-loggedin');
         } else {
             parts.push('user-guest');
         }
+
         return parts.join(' ');
     },
+
 };
+
+
+
 export default helpers;
