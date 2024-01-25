@@ -15,7 +15,7 @@ const groups = require('../groups');
 const analytics = require('../analytics');
 const privileges = require('../privileges');
 const cacheCreate = require('../cache/lru');
-const helpers = require('./helpers').default;
+const helpers = require('./helpers');
 
 const controllers = {
     api: require('../controllers/api'),
